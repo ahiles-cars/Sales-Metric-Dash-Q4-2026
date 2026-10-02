@@ -527,10 +527,16 @@ function section5(container){
 /* ==================================================================== */
 /* SECTION 6: Commissionable revenue actuals (stacked bar)              */
 /* ==================================================================== */
+function onFill(col){
+  const m=/^#?([0-9a-f]{6})$/i.exec(col.trim()); if(!m) return "#FFFFFF";
+  const n=parseInt(m[1],16), ch=[(n>>16)&255,(n>>8)&255,n&255].map(v=>{v/=255;return v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4);});
+  const L=0.2126*ch[0]+0.7152*ch[1]+0.0722*ch[2];
+  return L>0.4 ? "#1B0B2B" : "#FFFFFF";
+}
 function section6(container){
   container.innerHTML = `
     <div class="section-head"><h2><span class="num">6</span>Commissionable revenue actuals by product tower</h2></div>
-    <p class="section-desc">Monthly commissionable revenue split across the four product towers.</p>
+    <p class="section-desc">Monthly commissionable revenue split across the four product towers. Percentages show each tower's share of that month's total; hover a segment for dollars.</p>
     <div class="chart-wrap" id="s6-wrap"></div>
     <div class="legend" id="s6-legend"></div>
   `;
@@ -557,7 +563,17 @@ function section6(container){
       const rect = el("rect",{x:bx,y:y1,width:barW,height:Math.max(0,y0-y1),fill:cssVar(TOWER_VAR[t])});
       if(cum===0) rect.setAttribute("rx",0); // base
       svg.appendChild(rect);
-      rect.addEventListener("mouseenter",()=>{ rect.setAttribute("opacity",0.85); showTip(tip,wrap,cx,y1,`<b>${REV_MONTH_LABEL[m]} · ${t}</b><br>${fmtUSDFull(v)}`); });
+      const mTotal = totals[i], pct = mTotal>0 ? v/mTotal*100 : 0, segH = y0-y1;
+      if(v>0){
+        if(segH>=18){
+          const lt = el("text",{x:cx,y:(y0+y1)/2+4.5,"text-anchor":"middle","font-size":12.5,"font-weight":700,"font-family":"DM Sans, sans-serif","pointer-events":"none",fill:onFill(cssVar(TOWER_VAR[t]))});
+          lt.textContent = fmt1(pct)+"%"; svg.appendChild(lt);
+        } else {
+          const lt = el("text",{x:bx+barW+8,y:(y0+y1)/2+4.5,"text-anchor":"start","font-size":12,"font-weight":700,"font-family":"DM Sans, sans-serif","pointer-events":"none",fill:cssVar('--text-secondary')});
+          lt.textContent = t+" "+fmt1(pct)+"%"; svg.appendChild(lt);
+        }
+      }
+      rect.addEventListener("mouseenter",()=>{ rect.setAttribute("opacity",0.85); showTip(tip,wrap,cx,y1,`<b>${REV_MONTH_LABEL[m]} · ${t}</b><br>${fmtUSDFull(v)} · ${fmt1(pct)}% of month`); });
       rect.addEventListener("mouseleave",()=>{ rect.removeAttribute("opacity"); hideTip(tip); });
       cum += v;
     });
