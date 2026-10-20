@@ -490,16 +490,30 @@ function section4(container){
 /* ==================================================================== */
 /* SECTION 5: Weighted pipeline coverage by manager                     */
 /* ==================================================================== */
+let s5Weighted = true;
 function section5(container){
   container.innerHTML = `
     <div class="section-head">
-      <h2><span class="num">5</span>Weighted pipeline coverage — rest of year</h2>
+      <h2><span class="num">5</span><span id="s5-title"></span></h2>
+      <div class="controls">
+        <div class="seg" id="s5-seg"><button data-v="false">Non-weighted</button><button data-v="true">Weighted</button></div>
+      </div>
     </div>
-    <p class="section-desc">Open Oct–Dec pipeline weighted by <b>both</b> factors together — stage probability (Discovery 10% / Presentation 25% / Follow Up 60% / Closing 90%) <b>and</b> close-month run-way (Oct ×2.5, Nov ×1.5, Dec ×0.5) — divided by each manager's remaining Gap to Goal. 1.0 = weighted pipeline exactly covers the gap.</p>
-    <p class="section-note"><b>Methodology:</b> Remaining gap sums Gap to Goal only for seats that are still short of goal (gap &gt; 0). Seats already at or above goal (negative gap) are not counted as offsets, so one over-performing seat can't cancel out a teammate's shortfall or inflate the ratio. Weighted pipeline includes all of the manager's seats. Managers with no seat short of goal show "No remaining gap" and are excluded from the &ldquo;managers short on coverage&rdquo; count. Coverage is a team-level ratio: pipeline on an over-goal seat is not redistributed to a seat that is short.</p>
+    <p class="section-desc" id="s5-desc"></p>
+    <p class="section-desc" id="s5-desc-w" hidden>Open Oct–Dec pipeline weighted by <b>both</b> factors together — stage probability (Discovery 10% / Presentation 25% / Follow Up 60% / Closing 90%) <b>and</b> close-month run-way (Oct ×2.5, Nov ×1.5, Dec ×0.5) — divided by each manager's remaining Gap to Goal. 1.0 = weighted pipeline exactly covers the gap.</p>
+    <p class="section-note"><b>Methodology:</b> Remaining gap sums Gap to Goal only for seats that are still short of goal (gap &gt; 0). Seats already at or above goal (negative gap) are not counted as offsets, so one over-performing seat can't cancel out a teammate's shortfall or inflate the ratio. Pipeline includes all of the manager's seats. Managers with no seat short of goal show "No remaining gap" and are excluded from the &ldquo;managers short on coverage&rdquo; count. Coverage is a team-level ratio: pipeline on an over-goal seat is not redistributed to a seat that is short.</p>
     <div class="chart-wrap" id="s5-wrap"></div>
   `;
+  const descW = container.querySelector("#s5-desc-w").innerHTML;
+  const descU = "Raw open Oct–Dec pipeline MRR (no stage-probability or close-month weighting) divided by each manager's remaining Gap to Goal. 1.0 = unweighted pipeline exactly covers the gap. This overstates what is likely to land, since early-stage and late-closing deals count at full value.";
+  container.querySelector("#s5-seg").querySelectorAll("button").forEach(b=>{
+    b.onclick = ()=>{ s5Weighted = b.dataset.v==="true"; draw(); };
+  });
   function draw(){
+    const wl = s5Weighted ? "weighted" : "non-weighted";
+    container.querySelector("#s5-title").textContent = (s5Weighted?"Weighted":"Non-weighted")+" pipeline coverage — rest of year";
+    container.querySelector("#s5-desc").innerHTML = s5Weighted ? descW : descU;
+    container.querySelectorAll("#s5-seg button").forEach(b=> b.classList.toggle("active",(b.dataset.v==="true")===s5Weighted));
     const wrap = container.querySelector("#s5-wrap"); wrap.innerHTML="";
     const covRows = filtered(DATA.pipeline_coverage_rest_of_year);
     const gapRows = filtered(DATA.gap_to_goal);
@@ -508,7 +522,7 @@ function section5(container){
     const gapByMgr = {}; gapRows.forEach(r=>{ gapByMgr[r.manager]=(gapByMgr[r.manager]||0)+Math.max(0,r.gap_to_goal); });
     const weightedByMgr = {};
     covRows.forEach(r=>{
-      const w = (STAGE_WEIGHT[r.stage]||0) * (MONTH_MULT[r.close_month]||0);
+      const w = s5Weighted ? (STAGE_WEIGHT[r.stage]||0) * (MONTH_MULT[r.close_month]||0) : 1;
       weightedByMgr[r.manager] = (weightedByMgr[r.manager]||0) + r.mrr*w;
     });
     const data = managers.map(m=>{
@@ -520,7 +534,7 @@ function section5(container){
     const W=940, H=60+data.length*30, padL=170,padR=170,padT=14,padB=10, plotW=W-padL-padR, plotH=H-padT-padB;
     const maxAbs = Math.max(1.5, ...data.map(d=>Math.abs(d.coverage||0)))*1.1;
     const x = v => padL + (v/maxAbs)*(plotW);
-    const svg = el("svg",{class:"chart",viewBox:`0 0 ${W} ${H}`,"aria-label":"Weighted pipeline coverage by manager"});
+    const svg = el("svg",{class:"chart",viewBox:`0 0 ${W} ${H}`,"aria-label":(s5Weighted?"Weighted":"Non-weighted")+" pipeline coverage by manager"});
     svg.appendChild(el("line",{class:"grid-line",x1:x(1),x2:x(1),y1:padT,y2:padT+plotH,stroke:cssVar('--text-muted'),"stroke-dasharray":"4,3"}));
     const oneLbl = el("text",{class:"axis-label",x:x(1),y:padT-4,"text-anchor":"middle","font-weight":700}); oneLbl.textContent="1.0×"; svg.appendChild(oneLbl);
     const rowH = plotH/data.length;
@@ -528,7 +542,7 @@ function section5(container){
     data.forEach((d,i)=>{
       const cy = padT+i*rowH+rowH/2;
       const label = el("text",{class:"axis-label",x:padL-10,y:cy+4,"text-anchor":"end","font-weight":600}); label.textContent=d.manager; svg.appendChild(label);
-      if(d.coverage===null){ const nl = el("text",{x:x(0)+8,y:cy+4,"font-size":12,"font-style":"italic","font-family":"DM Sans, sans-serif",fill:cssVar('--text-muted')}); nl.textContent="No remaining gap — all seats at or above goal  ·  "+fmtUSD(d.wp)+" weighted"; svg.appendChild(nl); return; }
+      if(d.coverage===null){ const nl = el("text",{x:x(0)+8,y:cy+4,"font-size":12,"font-style":"italic","font-family":"DM Sans, sans-serif",fill:cssVar('--text-muted')}); nl.textContent="No remaining gap — all seats at or above goal  ·  "+fmtUSD(d.wp)+" "+wl; svg.appendChild(nl); return; }
       const color = d.coverage>=1 ? cssVar('--good') : (d.coverage>=0.7 ? cssVar('--warn') : cssVar('--bad'));
       const barH = rowH*0.55;
       const bx = Math.min(x(0), x(d.coverage)), bw = Math.max(2, Math.abs(x(d.coverage)-x(0)));
@@ -536,9 +550,9 @@ function section5(container){
       svg.appendChild(rect);
       const vlabel = el("text",{x:x(d.coverage)+(d.coverage>=0?8:-8),y:cy+4,"text-anchor":d.coverage>=0?"start":"end","font-size":12,"font-weight":700,"font-family":"DM Sans, sans-serif",fill:cssVar('--text-primary')});
       vlabel.textContent = fmt4(d.coverage)+"×";
-      const wpSpan = document.createElementNS("http://www.w3.org/2000/svg","tspan"); wpSpan.setAttribute("font-weight",500); wpSpan.setAttribute("fill",cssVar('--text-muted')); wpSpan.textContent="  ·  "+fmtUSD(d.wp)+" weighted"; vlabel.appendChild(wpSpan);
+      const wpSpan = document.createElementNS("http://www.w3.org/2000/svg","tspan"); wpSpan.setAttribute("font-weight",500); wpSpan.setAttribute("fill",cssVar('--text-muted')); wpSpan.textContent="  ·  "+fmtUSD(d.wp)+" "+wl; vlabel.appendChild(wpSpan);
       svg.appendChild(vlabel);
-      rect.addEventListener("mouseenter",()=>{ showTip(tip,wrap,x(d.coverage),cy,`<b>${d.manager}</b><br>Weighted pipeline: ${fmtUSDFull(d.wp)}<br>Remaining gap (seats still short of goal): ${fmtUSDFull(d.gap)}<br>Coverage: <b>${fmt4(d.coverage)}×</b>`); });
+      rect.addEventListener("mouseenter",()=>{ showTip(tip,wrap,x(d.coverage),cy,`<b>${d.manager}</b><br>${s5Weighted?"Weighted":"Non-weighted"} pipeline: ${fmtUSDFull(d.wp)}<br>Remaining gap (seats still short of goal): ${fmtUSDFull(d.gap)}<br>Coverage: <b>${fmt4(d.coverage)}×</b>`); });
       rect.addEventListener("mouseleave",()=>hideTip(tip));
     });
     wrap.appendChild(svg);
