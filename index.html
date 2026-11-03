@@ -358,7 +358,10 @@ function section1(container){
 
   /* Director-level forecast accuracy (Oct 2026 onward) */
   (function(){
-    const dRows = DIRECTOR_FA.filter(r=>filters.channel==="All" || TEAM_TO_CHANNEL[r.team]===filters.channel);
+    const TEAM_TO_REGION = {"Field East":"Field Region East","Field West":"Field Region West","Inside":"Unassigned","Majors":"Unassigned"};
+    const dRows = DIRECTOR_FA.filter(r=>(filters.channel==="All" || TEAM_TO_CHANNEL[r.team]===filters.channel)
+      && (filters.region==="All" || TEAM_TO_REGION[r.team]===filters.region)
+      && (filters.manager==="All" || r.director===filters.manager));
     const dirs = []; teams.forEach(tm=>{ Array.from(new Set(dRows.filter(r=>r.team===tm).map(r=>r.director))).forEach(d=>dirs.push({team:tm,director:d})); });
     dirs.forEach(d=>{ const rr=dRows.filter(r=>r.director===d.director); const f=rr.reduce((s,r)=>s+r.forecast,0)/rr.length; d.dev = f>0 ? Math.abs(rr[rr.length-1].actual/f*100-100) : Infinity; });
     dirs.sort((x,y)=>x.dev-y.dev);
